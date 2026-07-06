@@ -9,7 +9,7 @@ light-matter scattering. The core code in `src/` now supports:
 - arbitrary periodic box lengths `L_1, ..., L_d`;
 - one or several atoms with positions `r_j`, bare frequencies `Omega_j`, and
   continuum couplings `g_j`;
-- vacuum dispersion `omega_p = ||p||`;
+- vacuum dispersion `omega = ||p||`;
 - RK4 propagation in the single-excitation sector.
 
 The `benchmark_model/` folder keeps the one-dimensional single-atom benchmark
@@ -54,9 +54,9 @@ config = ExperimentConfig(
     atom_positions=[0.0],
     atom_frequencies=[Omega],
     atom_couplings=[1j * g],
-    photon={"omega_p": Omega, "delta_k": 0.05 * np.pi, "x_0": -12.5},
+    photon={"p0": [Omega], "Deltap0": [0.05 * np.pi], "x0": [-12.5]},
     time={"T": 25, "dt": 0.01},
-    cutoffs={"ir_cutoff": 7 * np.pi, "uv_cutoff": 13 * np.pi},
+    cutoffs={"omega_min": 7 * np.pi, "omega_max": 13 * np.pi},
 )
 
 experiment = Experiment(config)
@@ -64,15 +64,14 @@ experiment.propagate_state(progress=True)
 atom_pop, transmitted, reflected = experiment.compute_observables()
 ```
 
-For 2D, use `dimension=2`, two box lengths, 2D atom positions, and a photon
-direction:
+For 2D, use `dimension=2`, two box lengths, 2D atom positions, and 2D photon
+vectors:
 
 ```python
 photon = {
-    "omega_p": Omega,
-    "delta_k": 0.2,
-    "position": [-10, 0],
-    "direction": [1, 0],
+    "p0": [Omega, 0.0],
+    "Deltap0": [0.2, 0.2],
+    "x0": [-10, 0],
 }
 ```
 
@@ -91,10 +90,26 @@ Generated CSV files are stored under `benchmark_model/results/csv_files/`.
 
 ## 2D Fiber Setup
 
-Use `2d_setup/notebooks/geometry_creation.ipynb` to generate and save a matter
-interface CSV, then load it from
-`2d_setup/notebooks/experiment_class_example_2d.ipynb` before choosing the bath,
-wavepacket, and RK parameters.
+Create and reload 2D geometries from the single source in `src.fiber_geometry`:
+
+```python
+from src.fiber_geometry import create_geometry, load_geometry, plot_geometry
+
+kind = "slab"  # or "disk"
+lengths = [50.0, 1.0]
+matter_width = 1.0
+matter_height = 1.0
+N_A = 100
+N_layer = 1  # ignored for disk geometries
+
+geometry = create_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer)
+geometry = load_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer)
+```
+
+`lengths` defines the simulation box. `kind="slab"` distributes `N_A` atoms
+regularly across `N_layer` vertical layers inside the matter rectangle.
+`kind="disk"` uses the largest circle or ellipse that fits inside
+`matter_width` by `matter_height`.
 
 ## Environment
 

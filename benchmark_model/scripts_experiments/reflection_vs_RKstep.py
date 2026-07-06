@@ -7,17 +7,18 @@ import pandas as pd
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
-#Local imports
+from src.benchmark_config import make_benchmark_config
 from src.experiment import Experiment
-from benchmark_model.scripts_experiments.renormalization import make_benchmark_config
 
-def run_reflection_vs_RKstep(param_photon, param_atom, T, dt_tab, cutoffs, 
-                             index_experiment=0, index_omega_p = 0, store_results:bool=True, progress:bool=True):
+def run_reflection_vs_RKstep(param_photon, param_atom, T, dt_tab, cutoffs,
+                             index_experiment=0, index_p0 = 0, store_results:bool=True, progress:bool=True):
     
     """
     Run the benchmark reflection experiment while varying the RK timestep.
 
-    param_atom must contain {'Omega_A', 'g_A', 'L'}.
+    param_atom must contain {'Omega_A', 'g_A', 'lengths', 'positions'}.
+    param_photon must contain {'p0', 'Deltap0', 'x0'}.
+    cutoffs must contain {'omega_min', 'omega_max'}.
     """
 
     #prepare the array to store the results
@@ -44,7 +45,7 @@ def run_reflection_vs_RKstep(param_photon, param_atom, T, dt_tab, cutoffs,
     if store_results:
 
         df = pd.DataFrame(data_rows)
-        filename = (f'reflection_vs_RKstep_omegap_{index_omega_p}_xp{index_experiment}.csv' if index_experiment else 'reflection_vs_RKstep.csv')
+        filename = (f'reflection_vs_RKstep_p0_{index_p0}_xp{index_experiment}.csv' if index_experiment else 'reflection_vs_RKstep.csv')
         output_dir = project_root / 'benchmark_model' / 'results' / 'csv_files' / 'reflection_vs_RKstep'
         output_dir.mkdir(parents=True, exist_ok=True)
         df.to_csv(output_dir / filename, index=False)

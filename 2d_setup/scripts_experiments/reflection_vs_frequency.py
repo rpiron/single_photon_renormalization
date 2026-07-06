@@ -9,15 +9,11 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
 from src.experiment import Experiment
-from src.fiber_geometry import make_fiber_config, radius_label
+from src.fiber_geometry import make_fiber_config
 
 
 def _geometry_suffix(geometry: dict) -> str:
-    n_layers = int(geometry.get("N_layer", 0))
-    if n_layers > 0:
-        return f"NA{int(geometry['N_A'])}_NL{n_layers}"
-
-    return f"NA{int(geometry['N_A'])}_R{radius_label(geometry['interface_radius'])}"
+    return geometry["label"]
 
 
 def result_filename(geometry: dict, index_experiment: int) -> str:
@@ -32,6 +28,7 @@ def run_reflection_vs_frequency(
     cutoffs,
     geometry,
     index_experiment=0,
+    correction_scheme=None,
     store_results: bool = True,
     progress: bool = True,
 ):
@@ -39,12 +36,13 @@ def run_reflection_vs_frequency(
     Runs the 2D reflection/transmission experiment for different photon energies.
 
     Parameters:
-    param_photon_bis (Dict): Dictionary containing {'delta_k'}.
-    param_atom (Dict): Dictionary containing {'Omega_j', 'd_j'}.
+    param_photon_bis (Dict): Dictionary containing {'Deltap0', 'x0'}.
+    param_atom (Dict): Dictionary containing {'Omega_A', 'g_A', 'geometry'}.
     param_time_evol (Dict): Dictionary containing {'T', 'dt'}.
     frequency_values (np.array): Incoming photon energies omega_init.
-    cutoffs (Dict): Dictionary containing {'ir_cutoff', 'uv_cutoff'}.
-    geometry (Dict): Loaded geometry with L1, L2, N_A, interface_radius, atom_positions.
+    cutoffs (Dict): Dictionary containing {'omega_min', 'omega_max'}.
+    geometry (Dict): Loaded geometry with lengths, matter dimensions, N_A, label, atom_positions.
+    correction_scheme (str | None): None, '1d_scheme', or '2d_scheme'.
     """
 
     final_reflection_tab = np.zeros(len(frequency_values))
@@ -57,17 +55,15 @@ def run_reflection_vs_frequency(
     for i in tqdm(range(len(frequency_values)), disable=not progress):
         omega_init = frequency_values[i]
 
+        param_photon_current = param_photon_bis.copy()
+        param_photon_current["p0"] = [omega_init, 0.0]
+
         config = make_fiber_config(
-            L1=geometry["L1"],
-            L2=geometry["L2"],
-            atom_positions=geometry["atom_positions"],
-            Omega_j=param_atom["Omega_j"],
-            d_j=param_atom["d_j"],
-            omega_init=omega_init,
-            delta_k=param_photon_bis["delta_k"],
-            T=param_time_evol["T"],
-            dt=param_time_evol["dt"],
-            cutoffs=cutoffs,
+            param_photon_current,
+            param_atom,
+            param_time_evol,
+            cutoffs,
+            correction_scheme=correction_scheme,
         )
 
         experiment = Experiment(config)
@@ -94,8 +90,8 @@ def run_reflection_vs_frequency(
     if store_results:
         data_to_save = {
             "photon_frequency_tab": frequency_values,
-            "ir_cutoff": cutoffs["ir_cutoff"] * np.ones(len(frequency_values)),
-            "uv_cutoff": cutoffs["uv_cutoff"] * np.ones(len(frequency_values)),
+            "omega_min": cutoffs["omega_min"] * np.ones(len(frequency_values)),
+            "omega_max": cutoffs["omega_max"] * np.ones(len(frequency_values)),
             "n_modes_tab": n_modes_tab,
             "final_reflection_tab": final_reflection_tab,
             "final_transmission_tab": final_transmission_tab,

@@ -1,5 +1,3 @@
-from typing import Any
-
 import numpy as np
 
 from src.xp_config import ExperimentConfig
@@ -43,38 +41,6 @@ class Experiment:
         self.Tn_array = np.zeros(len(self.times))
         self.Rn_array = np.zeros(len(self.times))
         self.side_array = np.zeros(len(self.times))
-
-        self.check_parameters()
-
-    def check_parameters(self) -> bool:
-        if self.n_modes == 0:
-            raise ValueError("No photonic modes were retained by the cutoffs.")
-
-        if "amplitudes" not in self.photon:
-            central_omega = float(np.linalg.norm(self._central_momentum()))
-            ir_cutoff = self.cutoffs["ir_cutoff"]
-            uv_cutoff = self.cutoffs["uv_cutoff"]
-            if central_omega < ir_cutoff or central_omega > uv_cutoff:
-                self.messages["photon_outside_cutoffs"] = (
-                    "Warning: the central photon frequency is outside the retained "
-                    "frequency window."
-                )
-            elif "delta_k" in self.photon:
-                distance_to_cutoff = min(central_omega - ir_cutoff, uv_cutoff - central_omega)
-                if distance_to_cutoff < 3 * float(self.photon["delta_k"]):
-                    self.messages["photon_close_to_cutoffs"] = (
-                        "Warning: the central photon frequency is close to a cutoff; "
-                        "the incoming wavepacket may be visibly truncated."
-                    )
-
-        if self.dimension == 1 and self.n_atoms == 1 and "delta_k" in self.photon:
-            coupling_scale = abs(self.atom_couplings[0]) ** 2
-            if coupling_scale > 0 and float(self.photon["delta_k"]) / coupling_scale > 0.1:
-                self.messages["monochromatic_limit"] = (
-                    "Warning: the photon wavepacket is not in the monochromatic limit."
-                )
-
-        return True
 
     def propagate_state(self, progress: bool = False) -> tuple[np.ndarray, np.ndarray]:
         c_init = self._initial_photon_state()
@@ -137,7 +103,7 @@ class Experiment:
 
     def _build_modes(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         delta_p = 2 * np.pi / self.lengths
-        n_max = np.floor(self.cutoffs["uv_cutoff"] / delta_p).astype(int)
+        n_max = np.floor(self.cutoffs["omega_max"] / delta_p).astype(int)
 
         axes = [np.arange(-limit, limit + 1) for limit in n_max]
         grids = np.meshgrid(*axes, indexing="ij")
@@ -145,8 +111,8 @@ class Experiment:
         momenta = mode_indices * delta_p[None, :]
         omegas = np.linalg.norm(momenta, axis=1)
 
-        mask = (omegas >= self.cutoffs["ir_cutoff"]) & (
-            omegas <= self.cutoffs["uv_cutoff"]
+        mask = (omegas >= self.cutoffs["omega_min"]) & (
+            omegas <= self.cutoffs["omega_max"]
         )
         mode_indices = mode_indices[mask]
         momenta = momenta[mask]
@@ -165,61 +131,24 @@ class Experiment:
         return dt * np.arange(n_steps)
 
     def _initial_photon_state(self) -> np.ndarray:
-        if "amplitudes" in self.photon:
-            amplitudes = np.asarray(self.photon["amplitudes"], dtype=complex)
-            if amplitudes.shape != (self.n_modes,):
-                raise ValueError("photon['amplitudes'] must have shape (n_modes,).")
-            return self._normalize_state(amplitudes)
+        p0 = self.photon["p0"]
+        Deltap0 = self.photon["Deltap0"]
+        x0 = self.photon["x0"]
 
-        p0 = self._central_momentum()
-        x0 = self._vector_from_photon(("position", "x_0"), default=np.zeros(self.dimension))
-        delta_k = float(self.photon["delta_k"])
-
-        envelope = np.exp(-np.sum((self.momenta - p0[None, :]) ** 2, axis=1) / (4 * delta_k**2))
+        reduced_momenta = (self.momenta - p0[None, :]) / Deltap0[None, :]
+        envelope = np.exp(-np.sum(reduced_momenta**2, axis=1) / 4)
         phase = np.exp(-1j * self.momenta @ x0)
         return self._normalize_state(envelope * phase)
 
     def _initial_atom_state(self) -> np.ndarray:
-        if "atom_amplitudes" not in self.photon:
-            return np.zeros(self.n_atoms, dtype=complex)
-
-        amplitudes = np.asarray(self.photon["atom_amplitudes"], dtype=complex)
-        if amplitudes.shape != (self.n_atoms,):
-            raise ValueError("photon['atom_amplitudes'] must have shape (n_atoms,).")
-        return amplitudes
+        return np.zeros(self.n_atoms, dtype=complex)
 
     def _central_momentum(self) -> np.ndarray:
-        if "momentum" in self.photon:
-            return self._as_vector(self.photon["momentum"], "photon['momentum']")
-        if "p0" in self.photon:
-            return self._as_vector(self.photon["p0"], "photon['p0']")
-
-        omega_p = float(self.photon["omega_p"])
-        return omega_p * self._incident_direction()
+        return self.photon["p0"]
 
     def _incident_direction(self) -> np.ndarray:
-        direction = self.photon.get("direction", None)
-        if direction is None:
-            direction = np.array([1.0] + [0.0] * (self.dimension - 1))
-        vector = self._as_vector(direction, "photon['direction']")
-        norm = np.linalg.norm(vector)
-        if norm == 0:
-            raise ValueError("photon['direction'] must be non-zero.")
-        return vector / norm
-
-    def _vector_from_photon(self, keys: tuple[str, ...], default: Any) -> np.ndarray:
-        for key in keys:
-            if key in self.photon:
-                return self._as_vector(self.photon[key], f"photon['{key}']")
-        return self._as_vector(default, "default")
-
-    def _as_vector(self, value: Any, name: str) -> np.ndarray:
-        vector = np.asarray(value, dtype=float)
-        if vector.ndim == 0 and self.dimension == 1:
-            vector = vector.reshape(1)
-        if vector.shape != (self.dimension,):
-            raise ValueError(f"{name} must have shape ({self.dimension},).")
-        return vector
+        p0 = self._central_momentum()
+        return p0 / np.linalg.norm(p0)
 
     def _normalize_state(self, state: np.ndarray) -> np.ndarray:
         norm = np.linalg.norm(state)

@@ -28,18 +28,16 @@ def _atom_parameter_array(value: Any, n_atoms: int, dtype: Any, name: str) -> np
 
 
 def _cutoff_bounds(cutoffs: Mapping[str, float]) -> tuple[float, float]:
-    ir_cutoff = cutoffs.get("ir_cutoff", cutoffs.get("omega_min"))
-    uv_cutoff = cutoffs.get("uv_cutoff", cutoffs.get("omega_max"))
-    if ir_cutoff is None or uv_cutoff is None:
-        raise ValueError("cutoffs must define ir_cutoff and uv_cutoff.")
+    if "omega_min" not in cutoffs or "omega_max" not in cutoffs:
+        raise ValueError("cutoffs must define omega_min and omega_max.")
 
-    ir_cutoff = float(ir_cutoff)
-    uv_cutoff = float(uv_cutoff)
-    if ir_cutoff < 0:
-        raise ValueError("ir_cutoff must be non-negative.")
-    if uv_cutoff <= ir_cutoff:
-        raise ValueError("uv_cutoff must be larger than ir_cutoff.")
-    return ir_cutoff, uv_cutoff
+    omega_min = float(cutoffs["omega_min"])
+    omega_max = float(cutoffs["omega_max"])
+    if omega_min < 0:
+        raise ValueError("omega_min must be non-negative.")
+    if omega_max <= omega_min:
+        raise ValueError("omega_max must be larger than omega_min.")
+    return omega_min, omega_max
 
 
 def direction_from_angle(angle: float) -> np.ndarray:
@@ -67,25 +65,25 @@ def coupling_vector(
 def _pv_bessel_integral(
     omega: float,
     radius: float,
-    ir_cutoff: float,
-    uv_cutoff: float,
+    omega_min: float,
+    omega_max: float,
     epsabs: float,
     epsrel: float,
     limit: int,
 ) -> float:
     if omega <= 0:
         raise ValueError("omega must be positive.")
-    if omega == ir_cutoff or omega == uv_cutoff:
+    if omega == omega_min or omega == omega_max:
         raise ValueError("omega must not coincide with a cutoff.")
 
     def numerator(omega_prime: float) -> float:
         return omega_prime * j0(omega_prime * radius)
 
-    if ir_cutoff < omega < uv_cutoff:
+    if omega_min < omega < omega_max:
         value, _ = quad(
             numerator,
-            ir_cutoff,
-            uv_cutoff,
+            omega_min,
+            omega_max,
             weight="cauchy",
             wvar=omega,
             epsabs=epsabs,
@@ -99,8 +97,8 @@ def _pv_bessel_integral(
 
     value, _ = quad(
         integrand,
-        ir_cutoff,
-        uv_cutoff,
+        omega_min,
+        omega_max,
         epsabs=epsabs,
         epsrel=epsrel,
         limit=limit,
@@ -122,7 +120,7 @@ def two_dimensional_self_energy(
     positions = _as_positions(atom_positions)
     n_atoms = len(positions)
     d_j = _atom_parameter_array(d_j, n_atoms, float, "d_j")
-    ir_cutoff, uv_cutoff = _cutoff_bounds(cutoffs)
+    omega_min, omega_max = _cutoff_bounds(cutoffs)
 
     differences = positions[:, None, :] - positions[None, :, :]
     radii = np.linalg.norm(differences, axis=2)
@@ -135,8 +133,8 @@ def two_dimensional_self_energy(
         pv_by_radius[float(key)] = _pv_bessel_integral(
             float(omega),
             radius,
-            ir_cutoff,
-            uv_cutoff,
+            omega_min,
+            omega_max,
             epsabs,
             epsrel,
             limit,
@@ -352,7 +350,7 @@ def generate_target_profile(
     n_atoms = len(positions)
     Omega_j = _atom_parameter_array(Omega_j, n_atoms, float, "Omega_j")
     d_j = _atom_parameter_array(d_j, n_atoms, float, "d_j")
-    ir_cutoff, uv_cutoff = _cutoff_bounds(reference_cutoffs)
+    omega_min, omega_max = _cutoff_bounds(reference_cutoffs)
 
     data = _frequency_samples_dataframe(samples).reset_index(drop=True)
     profile_blocks = []
@@ -375,7 +373,7 @@ def generate_target_profile(
                 omega,
                 positions,
                 d_j,
-                {"ir_cutoff": ir_cutoff, "uv_cutoff": uv_cutoff},
+                {"omega_min": omega_min, "omega_max": omega_max},
                 epsabs=epsabs,
                 epsrel=epsrel,
                 limit=limit,

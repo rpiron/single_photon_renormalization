@@ -7,9 +7,8 @@ import pandas as pd
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
-#Local imports
+from src.benchmark_config import make_benchmark_config
 from src.experiment import Experiment
-from benchmark_model.scripts_experiments.renormalization import make_benchmark_config
 
 def run_reflection_vs_frequency(param_photon_bis, param_atom, param_time_evol, frequency_values, cutoffs, 
                                 index_experiment=0, correction:bool=False, store_results:bool=True, progress:bool=True):
@@ -18,10 +17,10 @@ def run_reflection_vs_frequency(param_photon_bis, param_atom, param_time_evol, f
     Runs the reflection against frequency experiment for different photon central frequencies.
     
     Parameters:
-    param_photon_bis (Dict) : Dictionary containing only {'delta_k', 'x_0'}
-    param_atom (Dict) : Dictionary containing {'Omega_A', 'g_A', 'L'}
+    param_photon_bis (Dict) : Dictionary containing only {'Deltap0', 'x0'}
+    param_atom (Dict) : Dictionary containing {'Omega_A', 'g_A', 'lengths', 'positions'}
     param_time_evol (Dict) : Dictionary containing {'T', 'dt'}
-    cutoffs (Dict) : Dictionary containing {'ir_cutoff', 'uv_cutoff'} 
+    cutoffs (Dict) : Dictionary containing {'omega_min', 'omega_max'}
     frequency_values (np.array) : Array of photon central frequency values
     index_experiment (int) : Index of the experiment if multiple are run in sequence.
     store_results (bool) : Whether to store the results in a CSV file.
@@ -37,9 +36,9 @@ def run_reflection_vs_frequency(param_photon_bis, param_atom, param_time_evol, f
     final_reflection_tab = np.zeros(len(frequency_values))
 
     for i in tqdm(range(len(frequency_values)), disable=not progress):
-        omega_p = frequency_values[i]
+        omega = frequency_values[i]
         param_photon_current = param_photon_bis.copy()
-        param_photon_current['omega_p'] = omega_p
+        param_photon_current["p0"] = [omega]
 
         config = make_benchmark_config(
             param_photon_current,
