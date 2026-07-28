@@ -16,5 +16,5 @@ venv.bak/
 .mplconfig/
 *.swp
 *.swo
+discussions/
 theory_tex/
-code_explanations/

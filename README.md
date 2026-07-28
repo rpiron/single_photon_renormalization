@@ -2,34 +2,29 @@
 
 ## Overview
 
-This repository contains a minimal momentum-space simulator for one-photon
-light-matter scattering. The core code in `src/` now supports:
+This repository contains two independent minimal momentum-space simulators for
+one-photon light-matter scattering:
 
-- one or two spatial dimensions;
-- arbitrary periodic box lengths `L_1, ..., L_d`;
-- one or several atoms with positions `r_j`, bare frequencies `Omega_j`, and
-  continuum couplings `g_j`;
-- vacuum dispersion `omega = ||p||`;
-- RK4 propagation in the single-excitation sector.
+- `waveguide_model/`: the one-dimensional single-atom waveguide benchmark used
+  in `main_tqe.pdf`;
+- `2d_setup/`: the two-dimensional fiber setup with its own geometry database,
+  target profiles, correction workflow, and local source code.
 
-The `benchmark_model/` folder keeps the one-dimensional single-atom benchmark
-used in `main_tqe.pdf`, including its cutoff-renormalization helper and the
-existing script/notebook/results workflow.
+Each model folder has its own local `src/` directory and should be treated
+independently.
 
 ## Project Structure
 
 ```text
 .
-├── src/
-│   ├── experiment.py       # Experiment class: modes, states, observables
-│   ├── rk_integrator.py    # RK4 propagation in the one-photon sector
-│   └── xp_config.py        # ExperimentConfig dataclass
-├── benchmark_model/
+├── waveguide_model/
+│   ├── src/
 │   ├── scripts_experiments/
 │   ├── notebooks/
 │   └── results/
 ├── 2d_setup/               # 2D fiber geometry experiments
-│   ├── geometries/          # Saved atomic-interface CSV geometries
+│   ├── src/
+│   ├── database_fiber/
 │   ├── notebooks/
 │   └── results/
 ├── timedomain_cross_validation/
@@ -37,63 +32,25 @@ existing script/notebook/results workflow.
 └── environment.yml
 ```
 
-## Minimal Usage
+## Waveguide Model
+
+Run the one-dimensional benchmark scripts from `waveguide_model/`:
 
 ```python
-import numpy as np
-
-from src.xp_config import ExperimentConfig
-from src.experiment import Experiment
-
-Omega = 10 * np.pi
-g = np.sqrt(np.pi / 2)
-
-config = ExperimentConfig(
-    dimension=1,
-    lengths=[50],
-    atom_positions=[0.0],
-    atom_frequencies=[Omega],
-    atom_couplings=[1j * g],
-    photon={"p0": [Omega], "Deltap0": [0.05 * np.pi], "x0": [-12.5]},
-    time={"T": 25, "dt": 0.01},
-    cutoffs={"omega_min": 7 * np.pi, "omega_max": 13 * np.pi},
-)
-
-experiment = Experiment(config)
-experiment.propagate_state(progress=True)
-atom_pop, transmitted, reflected = experiment.compute_observables()
-```
-
-For 2D, use `dimension=2`, two box lengths, 2D atom positions, and 2D photon
-vectors:
-
-```python
-photon = {
-    "p0": [Omega, 0.0],
-    "Deltap0": [0.2, 0.2],
-    "x0": [-10, 0],
-}
-```
-
-## Benchmark Workflow
-
-The benchmark scripts keep their historical public signatures and can still be
-driven from notebooks:
-
-```python
-from benchmark_model.scripts_experiments.reflection_vs_frequency import (
+from waveguide_model.scripts_experiments.reflection_vs_frequency import (
     run_reflection_vs_frequency,
 )
 ```
 
-Generated CSV files are stored under `benchmark_model/results/csv_files/`.
+Generated CSV files are stored under `waveguide_model/results/csv_files/`.
 
 ## 2D Fiber Setup
 
-Create and reload 2D geometries from the single source in `src.fiber_geometry`:
+Create and reload 2D geometries from `2d_setup/src/generate_fiber_geom.py`.
+Geometry CSV files are named by id and stored in `2d_setup/database_fiber/`:
 
 ```python
-from src.fiber_geometry import create_geometry, load_geometry, plot_geometry
+from src.generate_fiber_geom import create_geometry, load_geometry_by_id
 
 kind = "slab"  # or "disk"
 lengths = [50.0, 1.0]
@@ -101,9 +58,33 @@ matter_width = 1.0
 matter_height = 1.0
 N_A = 100
 N_layer = 1  # ignored for disk geometries
+rotation = 0.2  # radians, global rotation around the origin
 
-geometry = create_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer)
-geometry = load_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer)
+geometry = create_geometry(
+    kind,
+    lengths,
+    matter_width,
+    matter_height,
+    N_A,
+    N_layer,
+    rotation=rotation,
+)
+geometry_by_id = load_geometry_by_id(1)
+```
+
+Build a 2D experiment config with the local momentum notation:
+
+```python
+from src.bare_param import make_fiber_config
+
+param_photon = {
+    "p_0": [10 * np.pi, 0.0],
+    "sigma_p": [np.pi, np.pi],
+    "x_0": [-12.5, 0.0],
+}
+cutoffs = {"ir_cutoff": 8 * np.pi, "uv_cutoff": 12 * np.pi}
+param_atom = {"Omega_A": Omega_A, "d_A": d_A, "geometry": geometry}
+config = make_fiber_config(param_photon, param_atom, param_time_evol, cutoffs, correction=False)
 ```
 
 `lengths` defines the simulation box. `kind="slab"` distributes `N_A` atoms
