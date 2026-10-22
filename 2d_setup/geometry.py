@@ -4,7 +4,9 @@ from pathlib import Path
 import numpy as np
 
 
-DEFAULT_GEOMETRY_DIR = Path(__file__).resolve().parents[1] / "database_fiber" / "geometries"
+from .database import DATABASE_DIR
+
+DEFAULT_GEOMETRY_DIR = DATABASE_DIR / "geometries"
 
 
 def geometry_path(geometry_id=None, directory=DEFAULT_GEOMETRY_DIR):
@@ -29,6 +31,7 @@ def create_geometry(
     rotation=0.0,
     directory=DEFAULT_GEOMETRY_DIR,
     geometry_id=None,
+    save=True,
 ):
     kind = str(kind).lower()
     lengths = np.asarray(lengths, dtype=float).reshape(2)
@@ -88,19 +91,20 @@ def create_geometry(
         atom_positions = atom_positions @ np.array([[c, -s], [s, c]]).T
 
     path = geometry_path(geometry_id, directory)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as stream:
-        stream.write(f"# kind: {kind}\n")
-        stream.write(f"# lengths: {lengths[0]:.16g};{lengths[1]:.16g}\n")
-        stream.write(f"# matter_width: {matter_width:.16g}\n")
-        stream.write(f"# matter_height: {matter_height:.16g}\n")
-        stream.write(f"# N_A: {N_A}\n")
-        stream.write(f"# N_layer: {N_layer}\n")
-        stream.write(f"# rotation: {rotation:.16g}\n")
-        writer = csv.writer(stream)
-        writer.writerow(["atom_index", "x", "y"])
-        for atom_index, (x_value, y_value) in enumerate(atom_positions):
-            writer.writerow([atom_index, f"{x_value:.16g}", f"{y_value:.16g}"])
+    if save:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="") as stream:
+            stream.write(f"# kind: {kind}\n")
+            stream.write(f"# lengths: {lengths[0]:.16g};{lengths[1]:.16g}\n")
+            stream.write(f"# matter_width: {matter_width:.16g}\n")
+            stream.write(f"# matter_height: {matter_height:.16g}\n")
+            stream.write(f"# N_A: {N_A}\n")
+            stream.write(f"# N_layer: {N_layer}\n")
+            stream.write(f"# rotation: {rotation:.16g}\n")
+            writer = csv.writer(stream)
+            writer.writerow(["atom_index", "x", "y"])
+            for atom_index, (x_value, y_value) in enumerate(atom_positions):
+                writer.writerow([atom_index, f"{x_value:.16g}", f"{y_value:.16g}"])
 
     return _geometry_dict(path, kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, atom_positions)
 
@@ -156,6 +160,7 @@ def plot_geometry(
     directory=DEFAULT_GEOMETRY_DIR,
     ax=None,
     photon_position=None,
+    geometry=None,
 ):
     if ax is None:
         import matplotlib.pyplot as plt
@@ -163,7 +168,8 @@ def plot_geometry(
         _, ax = plt.subplots()
     from matplotlib.patches import Ellipse, Polygon, Rectangle
 
-    geometry = load_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, directory)
+    if geometry is None:
+        geometry = load_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, directory)
     box_width, box_height = geometry["lengths"]
     ax.add_patch(Rectangle((-box_width / 2, -box_height / 2), box_width, box_height, fill=False))
 
