@@ -7,7 +7,7 @@
 # correction: True
 # id_geom: 5
 # id_target_profile: 1
-time,T_n0
+time,mode_fidelity
 0.0,0.9999999999999953
 0.01,0.9999999999910085
 0.02,0.9999999999568472

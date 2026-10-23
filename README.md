@@ -77,23 +77,23 @@ single_photon_code/
 │   │   ├── generate_target_profile.ipynb
 │   │   │                               # Inspect or generate a reference spectral profile
 │   │   ├── run_correction.ipynb         # Fit bare parameters for a reduced frequency window
-│   │   └── modefidelity_vs_freqwindow.ipynb
+│   │   └── mode_fidelity_vs_freqwindow.ipynb
 │   │                                   # Compare calibrated and uncalibrated mode fidelity
 │   ├── scripts_experiments/
-│   │   └── transmittivity_vs_freqwindow.py
+│   │   └── mode_fidelity_vs_freqwindow.py
 │   │                                   # Run mode-fidelity scans and save their time traces
 │   └── results/
 │       ├── csv_files/
 │       │   ├── transmission_vs_frequency/
 │       │   │                           # transmission_vs_frequency_*.csv: saved frequency scans
-│       │   └── transmittivity_vs_freqwindow/
-│       │                               # transmittivity_vs_freqwindow_*.csv: mode-fidelity traces
+│       │   └── mode_fidelity_vs_freqwindow/
+│       │                               # mode_fidelity_vs_freqwindow_*.csv: mode-fidelity traces
 │       └── fig/
 │           ├── .gitkeep
 │           ├── bare_parameters_freqwindows_2d.pdf
 │           ├── density_snapshots_2d.pdf
-│           ├── final_modefidelity_vs_freqwindow_2d.pdf
-│           └── timedep_modefidelity_vs_freqwindow_2d.pdf
+│           ├── final_mode_fidelity_vs_freqwindow_2d.pdf
+│           └── timedep_mode_fidelity_vs_freqwindow_2d.pdf
 └── timedomain_cross_validation/        # Independent Julia time-domain scattering calculation
     ├── Project.toml                    # Julia project dependencies
     ├── Manifest.toml                   # Resolved Julia dependency versions
@@ -121,8 +121,6 @@ The waveguide model uses analytical bare-parameter calibration and does not requ
 3. Inspect or fit calibrated parameters with `run_correction.ipynb`.
 4. Run the example simulation or the frequency-window scan.
 
-Geometry 5, target profile 1, and their calibrated parameter sets are provided for the example workflow. The 2D scan retains the historical `transmittivity_vs_freqwindow` filenames and `T_n0` CSV column name, but the computed observable is **mode fidelity**, the overlap with the incident photon mode; it is distinct from the forward photon population.
-
-The result notebooks load the supplied CSV files by default. Where available, set `RUN_SIMULATIONS=True` to recompute the selected scans and write their CSV results. Set `SAVE_FIGURES=True` to export PDF plots, or `False` to keep plots inline without overwriting the exports. Geometry creation and calibration have their own controls: `SAVE_GEOMETRY`, `RECOMPUTE_PROFILE`, `RUN_CALIBRATION`, and `SAVE_DATA`.
+Geometry 5, target profile 1, and their calibrated parameter sets are provided for the example workflow.
 
 The Julia project is separate from the Conda environment. Its `jl_src/reflection.jl` script generates the time-domain reference CSV files, and `notebook/reflection_profile_jl_results.ipynb` visualizes those results.

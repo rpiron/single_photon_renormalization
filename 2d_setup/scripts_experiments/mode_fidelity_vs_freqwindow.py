@@ -14,7 +14,7 @@ from src import Experiment
 from src.xp_config import normalize_cutoffs
 
 
-def run_modefidelity_vs_freqwindow(
+def run_mode_fidelity_vs_freqwindow(
     param_photon_bis,
     param_atom,
     param_time_evol,
@@ -34,7 +34,7 @@ def run_modefidelity_vs_freqwindow(
     the fitted Omega_0,d_0 associated with that window.
     """
 
-    output_dir = Path(output_dir) if output_dir is not None else setup_root / "results" / "csv_files" / "transmittivity_vs_freqwindow"
+    output_dir = Path(output_dir) if output_dir is not None else setup_root / "results" / "csv_files" / "mode_fidelity_vs_freqwindow"
     if store_results:
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -75,10 +75,10 @@ def run_modefidelity_vs_freqwindow(
             if store_results:
                 path = (
                     output_dir
-                    / f"transmittivity_vs_freqwindow_omegainit_{index_omegainit}"
+                    / f"mode_fidelity_vs_freqwindow_omegainit_{index_omegainit}"
                     f"_xp_{index_xp}_{suffix}.csv"
                 )
-                data = pd.DataFrame({"time": experiment.times, "T_n0": mode_fidelity})
+                data = pd.DataFrame({"time": experiment.times, "mode_fidelity": mode_fidelity})
                 with path.open("w", newline="") as stream:
                     stream.write(f"# index_omegainit: {index_omegainit}\n")
                     stream.write(f"# index_xp: {index_xp}\n")
