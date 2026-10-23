@@ -23,11 +23,14 @@ def rk_propagator(config, progress=False):
         c_array = np.empty((len(times), c.size), dtype=complex)
         b_array = np.empty((len(times), b.size), dtype=complex)
         c_array[0], b_array[0] = c, b
+        
     for i in tqdm(range(1, len(times)), disable=not progress):
         t, h = times[i - 1], times[i] - times[i - 1]
+
         def increment(c_stage, b_stage, time):
             dc, db = state_derivative(c_stage, b_stage, config.g_0, detunings, time)
             return h * dc, h * db
+        
         c1, b1 = increment(c, b, t)
         c2, b2 = increment(c + c1 / 2, b + b1 / 2, t + h / 2)
         c3, b3 = increment(c + c2 / 2, b + b2 / 2, t + h / 2)

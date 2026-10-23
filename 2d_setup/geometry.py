@@ -1,24 +1,13 @@
+"""Create, load and plot atomic geometries."""
+
 import csv
 from pathlib import Path
 
 import numpy as np
 
-
 from .database import DATABASE_DIR
 
 DEFAULT_GEOMETRY_DIR = DATABASE_DIR / "geometries"
-
-
-def geometry_path(geometry_id=None, directory=DEFAULT_GEOMETRY_DIR):
-    directory = Path(directory)
-    if geometry_id is None:
-        ids = [
-            int(path.stem.removeprefix("geometry_id"))
-            for path in directory.glob("geometry_id*.csv")
-            if path.stem.removeprefix("geometry_id").isdigit()
-        ]
-        geometry_id = max(ids, default=0) + 1
-    return directory / f"geometry_id{int(geometry_id)}.csv"
 
 
 def create_geometry(
@@ -33,6 +22,7 @@ def create_geometry(
     geometry_id=None,
     save=True,
 ):
+    """Place atoms in a slab or disk, rotate them, and optionally save the geometry."""
     kind = str(kind).lower()
     lengths = np.asarray(lengths, dtype=float).reshape(2)
     matter_width = float(matter_width)
@@ -90,7 +80,12 @@ def create_geometry(
         c, s = np.cos(rotation), np.sin(rotation)
         atom_positions = atom_positions @ np.array([[c, -s], [s, c]]).T
 
-    path = geometry_path(geometry_id, directory)
+    directory = Path(directory)
+    if geometry_id is None:
+        ids = [int(p.stem.removeprefix("geometry_id"))
+               for p in directory.glob("geometry_id*.csv")]
+        geometry_id = max(ids, default=0) + 1
+    path = directory / f"geometry_id{int(geometry_id)}.csv"
     if save:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="") as stream:
@@ -106,70 +101,48 @@ def create_geometry(
             for atom_index, (x_value, y_value) in enumerate(atom_positions):
                 writer.writerow([atom_index, f"{x_value:.16g}", f"{y_value:.16g}"])
 
-    return _geometry_dict(path, kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, atom_positions)
+    return {
+        "id_geom": int(geometry_id), "kind": kind, "lengths": lengths,
+        "matter_width": matter_width, "matter_height": matter_height,
+        "N_A": N_A, "N_layer": N_layer, "rotation": rotation,
+        "atom_positions": atom_positions, "path": path, "label": path.stem,
+    }
 
 
 def load_geometry_by_id(geometry_id, directory=DEFAULT_GEOMETRY_DIR):
-    path = geometry_path(geometry_id, directory)
-    if not path.exists():
-        raise FileNotFoundError(f"geometry_id{int(geometry_id)} does not exist.")
-    return _load_geometry_csv(path)
-
-
-def load_geometry(
-    kind,
-    lengths,
-    matter_width,
-    matter_height,
-    N_A,
-    N_layer=None,
-    rotation=0.0,
-    directory=DEFAULT_GEOMETRY_DIR,
-):
-    path = _find_geometry_path(kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, directory)
-    return _load_geometry_csv(path)
-
-
-def read_geometry_metadata(path):
-    metadata = {}
-    with Path(path).open() as stream:
+    """Read the geometry metadata and atomic positions from one CSV."""
+    path = Path(directory) / f"geometry_id{int(geometry_id)}.csv"
+    with path.open(newline="") as stream:
+        metadata = {}
         for line in stream:
             if not line.startswith("#"):
+                rows = list(csv.DictReader(stream, fieldnames=line.strip().split(",")))
                 break
-            key, value = line[1:].strip().split(":", maxsplit=1)
-            metadata[key.strip()] = value.strip()
+            key, value = (part.strip() for part in line[1:].split(":", 1))
+            metadata[key] = value
     return {
+        "id_geom": int(geometry_id),
         "kind": metadata["kind"],
-        "lengths": np.asarray([float(v) for v in metadata["lengths"].split(";")]),
+        "lengths": np.fromstring(metadata["lengths"], sep=";"),
         "matter_width": float(metadata["matter_width"]),
         "matter_height": float(metadata["matter_height"]),
         "N_A": int(float(metadata["N_A"])),
         "N_layer": int(float(metadata["N_layer"])),
-        "rotation": float(metadata.get("rotation", 0.0)),
+        "rotation": float(metadata.get("rotation", 0.)),
+        "atom_positions": np.asarray([(float(row["x"]), float(row["y"])) for row in rows]),
+        "path": path,
+        "label": path.stem,
     }
 
 
-def plot_geometry(
-    kind,
-    lengths,
-    matter_width,
-    matter_height,
-    N_A,
-    N_layer=None,
-    rotation=0.0,
-    directory=DEFAULT_GEOMETRY_DIR,
-    ax=None,
-    photon_position=None,
-    geometry=None,
-):
+def plot_geometry(geometry, ax=None, photon_position=None):
+    """Plot a geometry already created or loaded by the caller."""
     if ax is None:
         import matplotlib.pyplot as plt
 
         _, ax = plt.subplots()
     from matplotlib.patches import Ellipse, Polygon, Rectangle
 
-    if geometry is None:
-        geometry = load_geometry(kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, directory)
     box_width, box_height = geometry["lengths"]
     ax.add_patch(Rectangle((-box_width / 2, -box_height / 2), box_width, box_height, fill=False))
 
@@ -194,58 +167,4 @@ def plot_geometry(
     ax.set_xlim(-box_width / 2, box_width / 2)
     ax.set_ylim(-box_height / 2, box_height / 2)
     ax.set_aspect("equal", adjustable="box")
-    return geometry
-
-
-def _find_geometry_path(kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, directory):
-    expected = {
-        "kind": str(kind).lower(),
-        "lengths": np.asarray(lengths, dtype=float).reshape(2),
-        "matter_width": float(matter_width),
-        "matter_height": float(matter_height),
-        "N_A": int(N_A),
-        "N_layer": 0 if str(kind).lower() == "disk" else int(N_layer),
-        "rotation": float(rotation),
-    }
-    for path in sorted(Path(directory).glob("geometry_id*.csv")):
-        metadata = read_geometry_metadata(path)
-        if (
-            metadata["kind"] == expected["kind"]
-            and np.allclose(metadata["lengths"], expected["lengths"])
-            and np.isclose(metadata["matter_width"], expected["matter_width"])
-            and np.isclose(metadata["matter_height"], expected["matter_height"])
-            and metadata["N_A"] == expected["N_A"]
-            and metadata["N_layer"] == expected["N_layer"]
-            and np.isclose(metadata["rotation"], expected["rotation"])
-        ):
-            return path
-    raise FileNotFoundError("Requested geometry does not exist.")
-
-
-def _load_geometry_csv(path):
-    metadata = read_geometry_metadata(path)
-    with Path(path).open(newline="") as stream:
-        rows = list(csv.DictReader(line for line in stream if not line.startswith("#")))
-    atom_positions = np.asarray([(float(row["x"]), float(row["y"])) for row in rows])
-    return _geometry_dict(Path(path), atom_positions=atom_positions, **metadata)
-
-
-def _geometry_dict(path, kind, lengths, matter_width, matter_height, N_A, N_layer, rotation, atom_positions):
-    raw_id = Path(path).stem.removeprefix("geometry_id")
-    return {
-        "kind": kind,
-        "id_geom": int(raw_id) if raw_id.isdigit() else None,
-        "lengths": np.asarray(lengths, dtype=float),
-        "matter_width": matter_width,
-        "matter_height": matter_height,
-        "N_A": N_A,
-        "N_layer": N_layer,
-        "rotation": rotation,
-        "atom_positions": atom_positions,
-        "path": Path(path),
-        "label": Path(path).stem,
-        "L1": lengths[0],
-        "L2": lengths[1],
-        "width": lengths[0],
-        "height": lengths[1],
-    }
+    return ax

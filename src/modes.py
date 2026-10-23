@@ -6,23 +6,18 @@ from .xp_config import normalize_cutoffs
 
 
 def momentum_grid(lengths, cutoffs):
-    """Return integer indices, momenta and energies, sorted by energy.
-
-    Both energy boundaries are included. A floating-point tolerance prevents
-    rounding from discarding modes mathematically on those boundaries.
-    """
+    """Return integer indices, momenta and energies, sorted by energy."""
     lengths = np.atleast_1d(np.asarray(lengths, dtype=float))
     if lengths.ndim != 1 or not np.all(np.isfinite(lengths)) or np.any(lengths <= 0):
         raise ValueError("Box lengths must be positive and finite.")
     bounds = normalize_cutoffs(cutoffs)
-    boundary_tolerance = 8 * np.finfo(float).eps * max(1., bounds["Omega_max"])
     delta_p = 2 * np.pi / lengths
-    n_max = np.floor((bounds["Omega_max"] + boundary_tolerance) / delta_p).astype(int)
+    n_max = np.floor(bounds["Omega_max"] / delta_p).astype(int)
     grids = np.meshgrid(*(np.arange(-n, n + 1) for n in n_max), indexing="ij")
     indices = np.stack([grid.ravel() for grid in grids], axis=1)
     momenta = indices * delta_p[None, :]
     omega = np.linalg.norm(momenta, axis=1)
-    mask = (omega >= bounds["Omega_min"] - boundary_tolerance) & (omega <= bounds["Omega_max"] + boundary_tolerance)
+    mask = (omega >= bounds["Omega_min"]) & (omega <= bounds["Omega_max"])
     order = np.argsort(omega[mask], kind="mergesort")
     if not np.any(mask):
         raise ValueError("The frequency window retains no modes in this box.")

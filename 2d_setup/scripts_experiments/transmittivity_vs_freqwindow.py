@@ -9,7 +9,7 @@ from tqdm import tqdm
 setup_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(setup_root.parent))
 
-from ..setup import make_fiber_config
+from ..setup import make_2d_config
 from src import Experiment
 from src.xp_config import normalize_cutoffs
 
@@ -30,7 +30,7 @@ def run_modefidelity_vs_freqwindow(
 
     param_photon_bis contains only sigma_p and x_init. For each run, p_init is set to
     [omega_init, 0]. cutoffs_list is the list of frequency windows indexed by
-    index_xp. If apply_correction=True, make_fiber_config replaces Omega_A,d_A by
+    index_xp. If apply_correction=True, make_2d_config replaces Omega_A,d_A by
     the fitted Omega_0,d_0 associated with that window.
     """
 
@@ -59,7 +59,7 @@ def run_modefidelity_vs_freqwindow(
             param_photon = dict(param_photon_bis)
             param_photon["p_init"] = [float(omega_init), 0.0]
 
-            config = make_fiber_config(
+            config = make_2d_config(
                 param_photon,
                 param_atom,
                 param_time_evol,
@@ -78,47 +78,23 @@ def run_modefidelity_vs_freqwindow(
                     / f"transmittivity_vs_freqwindow_omegainit_{index_omegainit}"
                     f"_xp_{index_xp}_{suffix}.csv"
                 )
-                _save_transmittivity_csv(
-                    path,
-                    experiment.times,
-                    mode_fidelity,
-                    omega_init,
-                    cutoffs,
-                    index_omegainit,
-                    index_xp,
-                    apply_correction,
-                    param_atom,
-                )
+                data = pd.DataFrame({"time": experiment.times, "T_n0": mode_fidelity})
+                with path.open("w", newline="") as stream:
+                    stream.write(f"# index_omegainit: {index_omegainit}\n")
+                    stream.write(f"# index_xp: {index_xp}\n")
+                    stream.write(f"# omega_init: {float(omega_init):.16g}\n")
+                    stream.write(f"# omega_init_pi: {float(omega_init) / np.pi:.16g}\n")
+                    stream.write(f"# ir_cutoff_pi: {float(cutoffs['Omega_min']) / np.pi:.16g}\n")
+                    stream.write(f"# uv_cutoff_pi: {float(cutoffs['Omega_max']) / np.pi:.16g}\n")
+                    stream.write(f"# correction: {bool(apply_correction)}\n")
+                    if param_atom["geometry"].get("id_geom") is not None:
+                        stream.write(f"# id_geom: {int(param_atom['geometry']['id_geom'])}\n")
+                    if param_atom.get("id_target_profile") is not None:
+                        stream.write(f"# id_target_profile: {int(param_atom['id_target_profile'])}\n")
+                    data.to_csv(stream, index=False)
                 paths.append(path)
 
             iterator.update(1)
 
     iterator.close()
     return final_fidelity, paths
-
-
-def _save_transmittivity_csv(
-    path,
-    time,
-    mode_fidelity,
-    omega_init,
-    cutoffs,
-    index_omegainit,
-    index_xp,
-    apply_correction,
-    param_atom,
-):
-    data = pd.DataFrame({"time": time, "T_n0": mode_fidelity})
-    with path.open("w", newline="") as stream:
-        stream.write(f"# index_omegainit: {index_omegainit}\n")
-        stream.write(f"# index_xp: {index_xp}\n")
-        stream.write(f"# omega_init: {float(omega_init):.16g}\n")
-        stream.write(f"# omega_init_pi: {float(omega_init) / np.pi:.16g}\n")
-        stream.write(f"# ir_cutoff_pi: {float(cutoffs['Omega_min']) / np.pi:.16g}\n")
-        stream.write(f"# uv_cutoff_pi: {float(cutoffs['Omega_max']) / np.pi:.16g}\n")
-        stream.write(f"# correction: {bool(apply_correction)}\n")
-        if param_atom["geometry"].get("id_geom") is not None:
-            stream.write(f"# id_geom: {int(param_atom['geometry']['id_geom'])}\n")
-        if param_atom.get("id_target_profile") is not None:
-            stream.write(f"# id_target_profile: {int(param_atom['id_target_profile'])}\n")
-        data.to_csv(stream, index=False)

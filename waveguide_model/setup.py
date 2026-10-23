@@ -25,11 +25,17 @@ def make_waveguide_config(*, L, Omega_0, gamma_0, photon, time, cutoffs,
     c_init = gaussian_packet(p_n, params, forward)
     
     return ExperimentConfig(
-        omega_n=omega_n, Omega_0=np.array([Omega_0]),
+        omega_n=omega_n, 
+        Omega_0=np.array([Omega_0]),
         g_0=np.full((len(omega_n), 1), 1j * np.sqrt(gamma_0 / (2 * L))),
-        c_init=c_init, b_init=np.zeros(1, complex), time=time,
-        p_n=p_n, mode_indices=mode_indices, forward_mask=forward,
-        backward_mask=backward, store_state=store_state,
+        c_init=c_init, 
+        b_init=np.zeros(1, complex), 
+        time=time,
+        p_n=p_n, 
+        mode_indices=mode_indices, 
+        forward_mask=forward,
+        backward_mask=backward, 
+        store_state=store_state,
         integrator_func=integrator_func,
         metadata={"model": "waveguide", "lengths": np.array([L]), "cutoffs": bounds},
     )

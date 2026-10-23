@@ -53,18 +53,26 @@ class ExperimentConfig:
     metadata: dict = field(default_factory=dict)
 
     def __post_init__(self):
-        for name, dtype in [("omega_n", float), ("Omega_0", float),
-                            ("g_0", complex), ("c_init", complex),
-                            ("b_init", complex), ("p_n", float),
-                            ("mode_indices", int), ("forward_mask", bool),
+        for name, dtype in [("omega_n", float), 
+                            ("Omega_0", float),
+                            ("g_0", complex), 
+                            ("c_init", complex),
+                            ("b_init", complex), 
+                            ("p_n", float),
+                            ("mode_indices", int), 
+                            ("forward_mask", bool),
                             ("backward_mask", bool)]:
             value = np.array(getattr(self, name), dtype=dtype, copy=True)
             if not np.all(np.isfinite(value)):
                 raise ValueError(f"{name} must contain finite values.")
             setattr(self, name, value)
         m, a = self.omega_n.size, self.Omega_0.size
-        expected = {"omega_n": (m,), "Omega_0": (a,), "g_0": (m, a),
-                    "c_init": (m,), "b_init": (a,), "forward_mask": (m,),
+        expected = {"omega_n": (m,), 
+                    "Omega_0": (a,), 
+                    "g_0": (m, a),
+                    "c_init": (m,), 
+                    "b_init": (a,), 
+                    "forward_mask": (m,),
                     "backward_mask": (m,)}
         for name, shape in expected.items():
             if getattr(self, name).shape != shape:

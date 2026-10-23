@@ -1,5 +1,5 @@
-"""Two-dimensional atomic arrays and their independent calibration workflow."""
+"""Two-dimensional atomic arrays."""
 
-from .setup import make_array_config, make_fiber_config
+from .setup import make_2d_config
 
-__all__ = ["make_array_config", "make_fiber_config"]
+__all__ = ["make_2d_config"]

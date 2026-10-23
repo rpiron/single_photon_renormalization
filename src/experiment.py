@@ -32,7 +32,7 @@ class Experiment:
         self.messages.clear()
         return self.c_array, self.b_array
 
-    def compute_observables(self, progress=False):
+    def compute_observables(self):
         if self.c_array is None:
             raise RuntimeError("Call propagate_state() before compute_observables().")
         obs = self.observables = compute_observables(self.c_array, self.b_array, self.config)
